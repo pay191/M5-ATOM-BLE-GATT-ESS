@@ -4,6 +4,8 @@ This project uses the M5Stack Atom S3 Lite and ENV Unit to create a Bluetooth Lo
 
 It is fully compliant with Bluetooth GATT specifications and encoded for compatibility with clients like **nRF Connect**, **Web Bluetooth**, or **custom dashboards**.
 
+[Watch a YouTube Video Overview](https://youtu.be/GuS6AuiUTvs)
+
 ---
 
 ## 🔧 Hardware Requirements
