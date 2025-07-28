@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>BLE Environment Sensor</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            background: #f9f9f9;
+        }
+        h1 {
+            margin-bottom: 1rem;
+        }
+        .sensor {
+            font-size: 1.5rem;
+            margin: 1rem 0;
+        }
+        button {
+            font-size: 1.2rem;
+            padding: 0.5rem 1rem;
+        }
+    </style>
+</head>
+<body>
+<h1>🔗 BLE Environment Sensor</h1>
+<button onclick="connectToBLE()">Connect to Sensor</button>
+<div class="sensor" id="temperature">🌡️ Temperature: --</div>
+<div class="sensor" id="humidity">💧 Humidity: --</div>
+<div class="sensor" id="pressure">🧭 Pressure: --</div>
+<div class="sensor" id="elevation">⛰️ Elevation: --</div>
+
+<script>
+    const UUID_ENVIRONMENT_SERVICE = '0000181a-0000-1000-8000-00805f9b34fb';
+    const UUID_TEMPERATURE = '00002a6e-0000-1000-8000-00805f9b34fb';
+    const UUID_HUMIDITY = '00002a6f-0000-1000-8000-00805f9b34fb';
+    const UUID_PRESSURE = '00002a6d-0000-1000-8000-00805f9b34fb';
+    const UUID_ELEVATION = '00002a6c-0000-1000-8000-00805f9b34fb';
+
+    let characteristics = {};
+
+    async function connectToBLE() {
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ services: [UUID_ENVIRONMENT_SERVICE] }]
+            });
+
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService(UUID_ENVIRONMENT_SERVICE);
+
+            const charTemp = await service.getCharacteristic(UUID_TEMPERATURE);
+            const charHumidity = await service.getCharacteristic(UUID_HUMIDITY);
+            const charPressure = await service.getCharacteristic(UUID_PRESSURE);
+            const charElevation = await service.getCharacteristic(UUID_ELEVATION);
+
+            characteristics = {
+                temperature: charTemp,
+                humidity: charHumidity,
+                pressure: charPressure,
+                elevation: charElevation
+            };
+
+            // Set up notifications
+            await setupNotification(charTemp, parseTemperature, 'temperature');
+            await setupNotification(charHumidity, parseHumidity, 'humidity');
+            await setupNotification(charPressure, parsePressure, 'pressure');
+            await setupNotification(charElevation, parseElevation, 'elevation');
+
+            console.log('✅ Connected and notifications enabled');
+        } catch (err) {
+            console.error('❌ BLE Connection Error:', err);
+        }
+    }
+
+    async function setupNotification(characteristic, parserFn, id) {
+        await characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', event => {
+            const value = parserFn(event.target.value);
+            document.getElementById(id).textContent = value;
+        });
+    }
+
+    function parseTemperature(dataView) {
+        const mantissa = dataView.getInt24(0);
+        const exponent = dataView.getInt8(3);
+        const value = mantissa * Math.pow(10, exponent);
+        return `🌡️ Temperature: ${value.toFixed(2)} °C`;
+    }
+
+    function parseHumidity(dataView) {
+        const raw = dataView.getUint16(0, true);
+        return `💧 Humidity: ${(raw / 100).toFixed(2)} %`;
+    }
+
+    function parsePressure(dataView) {
+        const raw = dataView.getUint32(0, true);
+        return `🧭 Pressure: ${(raw / 100).toFixed(2)} Pa`;
+    }
+
+    function parseElevation(dataView) {
+        const raw = dataView.getInt16(0, true);
+        return `⛰️ Elevation: ${raw} m`;
+    }
+
+    // Polyfill for 24-bit signed integer
+    DataView.prototype.getInt24 = function (byteOffset, littleEndian = true) {
+        let value = this.getUint8(byteOffset) |
+            (this.getUint8(byteOffset + 1) << 8) |
+            (this.getUint8(byteOffset + 2) << 16);
+        if (value & 0x800000) value |= 0xff000000; // Sign extend
+        return value;
+    };
+</script>
+</body>
+</html>
